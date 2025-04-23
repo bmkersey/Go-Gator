@@ -1,10 +1,13 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 
 	"github.com/bmkersey/Go-Gator/internal/config"
+	"github.com/bmkersey/Go-Gator/internal/database"
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -15,8 +18,17 @@ func main() {
 		return
 	}
 
+	db, err := sql.Open("postgres", cfg.DatabaseURL)
+	if err != nil {
+		fmt.Printf("error opening postgres: %s\n", err)
+		os.Exit(1)
+	}
+
+	dbQueries := database.New(db)
+
 	appState := state{
 		cfg: &cfg,
+		db:  dbQueries,
 	}
 
 	appCommands := commands{
@@ -24,6 +36,9 @@ func main() {
 	}
 
 	appCommands.register("login", handlerLogin)
+	appCommands.register("register", handlerRegister)
+	appCommands.register("reset", handlerReset)
+	appCommands.register("users", handlerUsers)
 
 	args := os.Args
 	if len(args) < 2 {
