@@ -10,3 +10,7 @@ type command struct {
 	name string
 	args []string
 }
+
+type commands struct {
+	cmdNames map[string]func(*state, command) error
+}
