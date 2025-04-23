@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func handlerAddFeed(s *state, cmd command) error {
+func handlerAddFeed(s *state, cmd command, user database.User) error {
 	if len(cmd.args) < 2 {
 		return fmt.Errorf("not enough args supplied: addfeed takes <name> <url> args")
 	}
@@ -31,6 +31,17 @@ func handlerAddFeed(s *state, cmd command) error {
 		return fmt.Errorf("error creating new feed: %s", err)
 	}
 
-	fmt.Printf("Feed was successfully created: %v\n", feed)
+	_, err = s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		UserID:    user.ID,
+		FeedID:    feed.ID,
+	})
+	if err != nil {
+		return fmt.Errorf("error creating follow for feed: %s", err)
+	}
+
+	fmt.Printf("Feed was successfully created and followed: %v\n", feed)
 	return nil
 }
