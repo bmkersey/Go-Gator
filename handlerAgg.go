@@ -3,17 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/bmkersey/Go-Gator/internal/database"
+	"github.com/google/uuid"
 )
 
 func handlerAgg(s *state, cmd command) error {
-	if len(cmd.args) < 1 {
-		return fmt.Errorf("command agg takes 1 argument: time_between_reqs")
-	}
-
 	timeBetweenReqs, err := time.ParseDuration(cmd.args[0])
 	if err != nil {
-		return fmt.Errorf("error parsing duration: %s", err)
+		timeBetweenReqs = 5 * time.Second
 	}
 
 	fmt.Printf("Collecting feeds every %v\n", timeBetweenReqs)
@@ -40,7 +40,38 @@ func scrapeFeeds(s *state) error {
 	}
 
 	for _, f := range fetchedFeed.Channel.Item {
-		fmt.Println(f.Title)
+		pubDate, err := time.Parse(time.RFC3339, f.PubDate)
+		if err != nil {
+			pubDate, err = time.Parse(time.RFC1123, f.PubDate)
+			if err != nil {
+				pubDate, err = time.Parse(time.RFC1123Z, f.PubDate)
+				if err != nil {
+					fmt.Printf("Failed to parse date '%s' with error: %v\n", f.PubDate, err)
+					// Use current time as fallback
+					pubDate = time.Now()
+				}
+			}
+		}
+		_, err = s.db.CreatePost(context.Background(), database.CreatePostParams{
+			ID:          uuid.New(),
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+			Title:       f.Title,
+			Url:         f.Link,
+			Description: f.Description,
+			PublishedAt: pubDate,
+			FeedID:      nextFeed.ID,
+		})
+		if err != nil {
+			if strings.Contains(err.Error(), "UNIQUE constraint failed") ||
+				strings.Contains(err.Error(), "duplicate key value") {
+				continue
+			}
+
+			fmt.Printf("error creating post: %v", err)
+			continue
+		}
+		fmt.Println("post saved!")
 	}
 
 	return nil
